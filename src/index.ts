@@ -156,21 +156,18 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
 
   buildPlugin satisfies Plugin
 
-  if (transforms.length > 1) {
-    return [
-      corePlugin,
-      ...transforms.slice(1).map(
-        transform =>
-          ({
-            name: 'vite-multi-spa:transform-html',
-            transformIndexHtml: {
-              order: 'pre',
-              handler: transformPagesOnly(transform),
-            },
-          }) satisfies Plugin
-      ),
-    ]
-  }
-
-  return corePlugin
+  return [
+    corePlugin,
+    buildPlugin,
+    ...transforms.slice(1).map(
+      transform =>
+        ({
+          name: 'vite-multi-spa:transform-html',
+          transformIndexHtml: {
+            order: 'pre',
+            handler: transformPagesOnly(transform),
+          },
+        }) satisfies Plugin
+    ),
+  ]
 }
