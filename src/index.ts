@@ -3,7 +3,6 @@ import path from 'node:path'
 import {
   type Connect,
   type IndexHtmlTransformHook,
-  Logger,
   normalizePath,
   type Plugin,
 } from 'vite'
@@ -73,9 +72,9 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
     emitFile: (file: { type: 'chunk'; id: string }) => void
   }
 
-  // The main plugin doesn't use the Plugin type directly, as that more easily
-  // leads to assignability errors as the Vite API evolves.
-  const mainPlugin = {
+  // Don't use the Plugin type directly, as that more easily leads to
+  // assignability errors as the Vite API evolves.
+  const corePlugin = {
     name: 'vite-multi-spa',
     configResolved(config: { root: string }) {
       root = config.root
@@ -116,6 +115,14 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
       transforms.length > 0
         ? { order: 'pre' as const, handler: transformPagesOnly(transforms[0]) }
         : undefined,
+  } as const
+
+  // Is the plugin adherent to Vite's plugin API?
+  corePlugin satisfies Plugin
+
+  const buildPlugin = {
+    name: 'vite-multi-spa:build',
+    apply: 'build',
     buildStart(this: PluginBuildContext) {
       if (this.environment.name !== 'client') {
         return
@@ -147,16 +154,15 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
     } satisfies Plugin['generateBundle'],
   } as const
 
-  // Is the plugin adherent to Vite's plugin API?
-  mainPlugin satisfies Plugin
+  buildPlugin satisfies Plugin
 
   if (transforms.length > 1) {
     return [
-      mainPlugin,
+      corePlugin,
       ...transforms.slice(1).map(
         transform =>
           ({
-            name: 'vite-multi-spa-transform',
+            name: 'vite-multi-spa:transform-html',
             transformIndexHtml: {
               order: 'pre',
               handler: transformPagesOnly(transform),
@@ -166,5 +172,5 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
     ]
   }
 
-  return mainPlugin
+  return corePlugin
 }
