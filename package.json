@@ -31,7 +31,8 @@
   },
   "prettier": "@alloc/prettier-config",
   "scripts": {
-    "build": "tsgo -b tsconfig.json"
+    "build": "tsgo -b tsconfig.json",
+    "prepublishOnly": "pnpm build"
   },
   "files": [
     "dist",
