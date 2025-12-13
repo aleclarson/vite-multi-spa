@@ -1,0 +1,40 @@
+{
+  "name": "vite-multi-spa",
+  "type": "module",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "import": "./dist/index.js"
+  },
+  "version": "0.0.0",
+  "description": "A Vite plugin for building multi-spa applications",
+  "license": "MIT",
+  "keywords": [
+    "vite",
+    "multi-spa",
+    "spa",
+    "multi-page",
+    "mpa",
+    "html",
+    "plugin"
+  ],
+  "author": "Alec Larson",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aleclarson/vite-multi-spa.git"
+  },
+  "devDependencies": {
+    "@alloc/prettier-config": "^1.0.0",
+    "@types/node": "^25.0.1",
+    "@typescript/native-preview": "7.0.0-dev.20251212.1",
+    "prettier": "^3.7.4",
+    "vite": "^7.2.7"
+  },
+  "prettier": "@alloc/prettier-config",
+  "scripts": {
+    "build": "tsgo -b tsconfig.json"
+  },
+  "files": [
+    "dist",
+    "!*.tsbuildinfo"
+  ]
+}
