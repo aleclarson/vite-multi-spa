@@ -30,3 +30,7 @@ export default defineConfig({
 
 - `pagesRoot` (`string`, default `src/pages`): Folder scanned for `.html` pages.
 - `transformPageHtml` (`IndexHtmlTransformHook | IndexHtmlTransformHook[]`): Passed through to Vite and scoped to pages. See [Vite's API documentation](https://vite.dev/guide/api-plugin#transformindexhtml).
+
+## Example
+
+See the [`example` branch](https://github.com/aleclarson/vite-multi-spa/tree/example), run `pnpm install && pnpm dev`, and you will observe `src/pages/contact.html` served in dev mode and emitted through the build so SPA behavior is obvious in both scenarios.
