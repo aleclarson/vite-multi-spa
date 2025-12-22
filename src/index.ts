@@ -5,6 +5,7 @@ import {
   type IndexHtmlTransformHook,
   normalizePath,
   type Plugin,
+  type Rollup,
 } from 'vite'
 
 export type ViteMultiSpaOptions = {
@@ -66,6 +67,7 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
 
   type PluginContext = {
     environment: { name: string }
+    resolve: Rollup.PluginContext['resolve']
   }
 
   type PluginBuildContext = PluginContext & {
@@ -115,6 +117,19 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
       transforms.length > 0
         ? { order: 'pre' as const, handler: transformPagesOnly(transforms[0]) }
         : undefined,
+    // Resolve `import` statements in `.html` files’ <script> tags.
+    resolveId(this: PluginContext, id: string, importer: string | undefined) {
+      if (!importer) return
+      if (importer[0] !== '\0') return
+      if (!importer.includes('?html-proxy')) return
+
+      const importerFile = normalizePath(importer.slice(1).replace(/\?.*$/, ''))
+      if (importerFile.startsWith(root + '/' + pagesRoot + '/')) {
+        return this.resolve(id, importerFile, {
+          skipSelf: true,
+        })
+      }
+    },
   } as const
 
   // Is the plugin adherent to Vite's plugin API?
