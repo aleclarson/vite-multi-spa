@@ -30,6 +30,14 @@ export default defineConfig({
 
 - `pagesRoot` (`string`, default `src/pages`): Folder scanned for `.html` pages.
 - `transformPageHtml` (`IndexHtmlTransformHook | IndexHtmlTransformHook[]`): Passed through to Vite and scoped to pages. See [Vite's API documentation](https://vite.dev/guide/api-plugin#transformindexhtml).
+- `redirects` (`Record<string, string>`): Rewrite requests matching a pattern to a specific `.html` file (resolved using the `pagesRoot`). Supports Cloudflare-style [splats and placeholders](https://developers.cloudflare.com/pages/configuration/redirects/#splats).
+  ```ts
+  redirects: {
+    '/admin/*': 'admin.html',
+    '/users/:id': 'user.html',
+    '/blog/*': 'blog/:splat.html',
+  }
+  ```
 
 ## Example
 
