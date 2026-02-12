@@ -32,6 +32,7 @@ export type ViteMultiSpaOptions = {
 
 export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
   let root: string
+  let isCloudflare = false
 
   const pagesRoot = options.pagesRoot
     ? normalizePath(options.pagesRoot).replace(/(^\/|\/$)/g, '')
@@ -135,15 +136,25 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
   }
 
   type PluginBuildContext = PluginContext & {
-    emitFile: (file: { type: 'chunk'; id: string }) => void
+    emitFile: (
+      file:
+        | { type: 'chunk'; id: string }
+        | { type: 'asset'; fileName: string; source: string }
+    ) => void
   }
 
   // Don't use the Plugin type directly, as that more easily leads to
   // assignability errors as the Vite API evolves.
   const corePlugin = {
     name: 'vite-multi-spa',
-    configResolved(config: { root: string }) {
+    configResolved(config: {
+      root: string
+      plugins: readonly { name: string }[]
+    }) {
       root = config.root
+      isCloudflare = config.plugins.some(
+        p => p.name === '@cloudflare/vite-plugin'
+      )
     },
     configureServer: {
       order: 'pre',
@@ -228,10 +239,28 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
     },
     generateBundle: {
       order: 'post',
-      handler(this: PluginContext, _options, bundle) {
+      handler(this: PluginBuildContext, _options, bundle) {
         if (this.environment.name !== 'client') {
           return
         }
+
+        const redirectEntries = Object.entries(options.redirects || {})
+        if (isCloudflare && redirectEntries.length > 0) {
+          const content =
+            redirectEntries
+              .map(([pattern, target]) => {
+                const targetUrl = target.startsWith('/') ? target : '/' + target
+                return `${pattern} ${targetUrl} 200`
+              })
+              .join('\n') + '\n'
+
+          this.emitFile({
+            type: 'asset',
+            fileName: '_redirects',
+            source: content,
+          })
+        }
+
         // Flatten the pages root into the root.
         for (const filename in bundle) {
           const file = bundle[filename]
