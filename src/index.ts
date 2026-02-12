@@ -19,6 +19,15 @@ export type ViteMultiSpaOptions = {
    * @see https://vite.dev/guide/api-plugin#transformindexhtml
    */
   transformPageHtml?: IndexHtmlTransformHook | readonly IndexHtmlTransformHook[]
+  /**
+   * Rewrite requests matching a pattern to a specific `.html` file.
+   * The target path is resolved relative to the `pagesRoot`.
+   *
+   * Supports Cloudflare-style patterns:
+   * - Splats: `*` (matches anything greedily)
+   * - Placeholders: `:name` (matches anything until `/`)
+   */
+  redirects?: Record<string, string>
 }
 
 export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
@@ -27,6 +36,61 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
   const pagesRoot = options.pagesRoot
     ? normalizePath(options.pagesRoot).replace(/(^\/|\/$)/g, '')
     : 'src/pages'
+
+  const redirects = Object.entries(options.redirects || {}).map(
+    ([pattern, target]) => {
+      // Escape regex characters except * and :
+      const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+
+      // Convert splats and placeholders to capture groups
+      let regexStr = '^'
+      let lastIndex = 0
+      const tokenRegex = /(\*)|(:[a-zA-Z_]\w*)/g
+      let match
+
+      while ((match = tokenRegex.exec(escaped))) {
+        const [full, splat, placeholder] = match
+        const index = match.index
+
+        regexStr += escaped.slice(lastIndex, index)
+
+        if (splat) {
+          regexStr += '(?<splat>.*)'
+        } else if (placeholder) {
+          const name = placeholder.slice(1)
+          regexStr += `(?<${name}>[^/]+)`
+        }
+
+        lastIndex = index + full.length
+      }
+
+      regexStr += escaped.slice(lastIndex) + '$'
+      const regex = new RegExp(regexStr)
+
+      return (url: string) => {
+        const match = url.match(regex)
+        if (!match) return null
+
+        let result = target
+        if (match.groups) {
+          for (const [name, value] of Object.entries(match.groups)) {
+            result = result.replace(new RegExp(`:${name}\\b`, 'g'), value)
+          }
+        }
+        return normalizePath(result)
+      }
+    }
+  )
+
+  const resolveRedirect = (url: string) => {
+    for (const match of redirects) {
+      const target = match(url)
+      if (target) {
+        const pageUrl = target.startsWith('/') ? target : '/' + target
+        return resolvePageUrl(pageUrl.replace(/\.html$/, ''))
+      }
+    }
+  }
 
   // Given a request URL, return the corresponding page URL. This is used to
   // serve documents (and their relative assets) from the pages root.
@@ -85,30 +149,43 @@ export default function viteMultiSpa(options: ViteMultiSpaOptions = {}) {
       order: 'pre',
       handler(server: { middlewares: Connect.Server }) {
         server.middlewares.use((req, _res, next) => {
-          const url = req.url!
+          const [url, query = ''] = req.url!.split('?')
+
           const secFetchDest = req.headers['sec-fetch-dest']
           if (secFetchDest === 'document') {
+            const redirectUrl = resolveRedirect(url)
+            if (redirectUrl) {
+              req.url = redirectUrl + (query ? '?' + query : '')
+              delete req.originalUrl
+              return next()
+            }
+
             // Serve documents from the pages root.
             const pageUrl = resolvePageUrl(url)
             if (pageUrl) {
-              req.url = pageUrl
+              req.url = pageUrl + (query ? '?' + query : '')
               delete req.originalUrl
             }
           } else if (secFetchDest && req.headers['referer']) {
             if (url.startsWith('/@vite/')) {
               return next()
             }
+
             const referer = new URL(req.headers['referer'])
-            const pageUrl = resolvePageUrl(referer.pathname)
+            const pageUrl =
+              resolveRedirect(referer.pathname) ||
+              resolvePageUrl(referer.pathname)
+
             if (pageUrl && !fs.existsSync(path.join(root, url))) {
               // Serve assets relative to the document's filesystem location.
               const assetUrl = pageUrl.slice(0, pageUrl.lastIndexOf('/')) + url
               if (fs.existsSync(path.join(root, assetUrl))) {
-                req.url = assetUrl
+                req.url = assetUrl + (query ? '?' + query : '')
                 delete req.originalUrl
               }
             }
           }
+
           next()
         })
       },
